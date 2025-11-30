@@ -1,0 +1,382 @@
+#+STARTUP: show2levels hideblocks
+#+OPTIONS: num:nil author:nil
+#+PROPERTY: header-args :mkdirp yes
+* nixos root cosmic
+** update
+*** tangle dotfiles
+**** tangle document
+
+C-c C-v t
+
+**** tangle only one code block
+
+C-u C-c C-v t
+
+**** tangle from the command line
+
+#+begin_src sh
+emacs --batch -l org --eval '(org-babel-tangle-file "~/git/ubuntu-dotfiles/ubuntu-dotfiles.org")'
+#+end_src
+
+*** flake update
+
+update the flake
+
+#+begin_src sh
+nix flake update 
+#+end_src
+
+run nixos-rebuild switch with the flake option
+
+#+begin_src sh
+doas nixos-rebuild switch --flake '.#castor'
+#+end_src
+
+add the new flake to the git repo and push
+
+#+begin_src sh
+git add .
+git commit -m "nixos flake"
+git push github master
+#+end_src
+
+if there are any errors you can revert the flake.lock file
+
+#+begin_src sh
+git checkout 'HEAD^' -- flake.lock
+#+end_src
+
+This command will revert flake.lock to its state in the previous commit.
+
+If you updated multiple times, you might need to go back further
+e.g., HEAD~2 for two commits ago, or look at
+
+#+begin_src sh
+git log --oneline flake.lock
+#+end_src
+
+to find the exact commit hash
+
+** configuration.nix
+*** configuration.nix config
+
+#+NAME: configuration.nix
+#+begin_src nix
+# Edit this configuration file to define what should be installed on
+# your system. Help is available in the configuration.nix(5) man page, on
+# https://search.nixos.org/options and in the NixOS manual (`nixos-help`).
+
+{ config, lib, pkgs, ... }:
+
+{
+  imports =
+    [ # Include the results of the hardware scan.
+      ./hardware-configuration.nix
+    ];
+
+  # Use the systemd-boot EFI boot loader.
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+  boot.tmp.cleanOnBoot = true;
+
+  networking.hostName = "castor"; # Define your hostname.
+  # Pick only one of the below networking options.
+  networking.networkmanager.enable = true;  # Easiest to use and most distros use this by default.
+  networking.hostId = "37725d60";
+
+  # Set your time zone.
+  time.timeZone = "Europe/London";
+
+  # broadcom fix permitted insecure packages
+  nixpkgs.config.allowInsecurePredicate = pkg:
+    builtins.elem (lib.getName pkg) [
+      "broadcom-sta" # aka “wl”
+    ];
+
+  # nix garbage collection
+  nix = {
+    settings.auto-optimise-store = true;
+    gc = {
+      automatic = true;
+      dates = "weekly";
+      options = "--delete-older-than 7d";
+    };
+  };
+
+  # Select internationalisation properties.
+  i18n.defaultLocale = "en_GB.UTF-8";
+
+  i18n.extraLocaleSettings = {
+    LC_ADDRESS = "en_GB.UTF-8";
+    LC_IDENTIFICATION = "en_GB.UTF-8";
+    LC_MEASUREMENT = "en_GB.UTF-8";
+    LC_MONETARY = "en_GB.UTF-8";
+    LC_NAME = "en_GB.UTF-8";
+    LC_NUMERIC = "en_GB.UTF-8";
+    LC_PAPER = "en_GB.UTF-8";
+    LC_TELEPHONE = "en_GB.UTF-8";
+    LC_TIME = "en_GB.UTF-8";
+  };
+
+  # nix flakes
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+  console.keyMap = "us";
+  nixpkgs.config.allowUnfree = true;
+
+  # --- XDG Desktop Portal Configuration for Wayland ---
+  xdg.portal = {
+    enable = true;
+    xdgOpenUsePortal = true; # Recommended for better portal integration
+  };
+
+
+  # Enable the X11 windowing system.
+  services = {
+    xserver = {
+      enable = true;
+  xkb = {
+  layout = "gb";
+  variant = "mac";
+  };
+  };
+
+  # Enable the COSMIC login manager
+  services.displayManager.cosmic-greeter.enable = true;
+
+  # Enable the COSMIC desktop environment
+  services.desktopManager.cosmic.enable = true;
+
+  # cosmic clipboard
+  environment.sessionVariables.COSMIC_DATA_CONTROL_ENABLED = 1;
+
+  thermald.enable = true;
+  printing.enable = false;
+  libinput.enable = true;
+  openssh.enable = true;
+
+  pipewire = {
+    enable = true;
+    pulse.enable = true;
+  };
+
+};
+
+  hardware = {
+    graphics = {
+      enable = true;
+      extraPackages = with pkgs; [
+        intel-vaapi-driver
+        libva-vdpau-driver
+        libvdpau-va-gl
+     ];
+    };
+};
+  
+
+  # Enable touchpad support (enabled default in most desktopManager).
+
+  users.users.djwilcox.initialPassword = "password";
+  users.mutableUsers = true;
+
+  # Define a user account. Don't forget to set a password with ‘passwd’.
+  users.users.djwilcox = {
+    isNormalUser = true;
+    extraGroups = [ "wheel audio networkmanager video" ]; # Enable ‘sudo’ for the user.
+  };
+
+  users.users.djwilcox.shell = pkgs.zsh;
+  security.sudo.enable = true;
+
+# rtkit for audio
+security.rtkit.enable = true;
+
+# doas
+security.doas = {
+  enable = true;
+  extraConfig = ''
+    # allow user
+    permit keepenv setenv { PATH } djwilcox
+    
+    # allow root to switch to our user
+    permit nopass keepenv setenv { PATH } root as djwilcox
+
+    # nopass
+    permit nopass keepenv setenv { PATH } djwilcox
+
+    # nixos-rebuild switch
+    permit nopass keepenv setenv { PATH } djwilcox cmd nixos-rebuild
+    
+    # root as root
+    permit nopass keepenv setenv { PATH } root as root
+  '';
+};
+
+
+  # programs.firefox.enable = true;
+  programs = {
+  firefox.preferences = {
+    # disable libadwaita theming for Firefox
+    "widget.gtk.libadwaita-colors.enabled" = false;
+  };
+  zsh = {
+      enable = true;
+      enableCompletion = true;
+      syntaxHighlighting.enable = true;
+   };
+   dconf.enable = true;
+   mtr.enable = true;
+
+   gnupg.agent = {
+    enable = true;
+    enableSSHSupport = true;
+  };
+};
+
+
+  # List packages installed in system profile. To search, run:
+  # $ nix search wget
+  environment.systemPackages = with pkgs; [
+  vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+  ];
+
+  # Some programs need SUID wrappers, can be configured further or are
+  # started in user sessions.
+
+  # List services that you want to enable:
+
+  # Enable the OpenSSH daemon.
+
+  # Open ports in the firewall.
+  networking.firewall.allowedTCPPorts = [ 6881 ];
+  networking.firewall.allowedUDPPorts = [ 6882 ];
+  # Or disable the firewall altogether.
+  # networking.firewall.enable = false;
+
+  # Copy the NixOS configuration file and link it from the resulting system
+  # (/run/current-system/configuration.nix). This is useful in case you
+  # accidentally delete configuration.nix.
+  #system.copySystemConfiguration = true;
+
+  # This option defines the first version of NixOS you have installed on this particular machine,
+  # and is used to maintain compatibility with application data (e.g. databases) created on older NixOS versions.
+  #
+  # Most users should NEVER change this value after the initial install, for any reason,
+  # even if you've upgraded your system to a new NixOS release.
+  #
+  # This value does NOT affect the Nixpkgs version your packages and OS are pulled from,
+  # so changing it will NOT upgrade your system - see https://nixos.org/manual/nixos/stable/#sec-upgrading for how
+  # to actually do that.
+  #
+  # This value being lower than the current NixOS release does NOT mean your system is
+  # out of date, out of support, or vulnerable.
+  #
+  # Do NOT change this value unless you have manually inspected all the changes it would make to your configuration,
+  # and migrated your data accordingly.
+  #
+  # For more information, see `man configuration.nix` or https://nixos.org/manual/nixos/stable/options#opt-system.stateVersion .
+  system.stateVersion = "25.05"; # Did you read the comment?
+
+}
+
+#+end_src
+
+*** configuration.nix tangle
+
+#+NAME: configuration.nix-current-dir
+#+BEGIN_SRC nix :noweb yes :tangle "configuration.nix"
+<<configuration.nix>>
+#+END_SRC
+
+** hardware-configuration.nix
+*** hardware-configuration.nix config
+
+#+NAME: hardware-configuration.nix
+#+begin_src nix
+# Do not modify this file!  It was generated by ‘nixos-generate-config’
+# and may be overwritten by future invocations.  Please make changes
+# to /etc/nixos/configuration.nix instead.
+{ config, lib, pkgs, modulesPath, ... }:
+
+{
+  imports =
+    [ (modulesPath + "/installer/scan/not-detected.nix")
+    ];
+
+  boot.initrd.availableKernelModules = [ "uhci_hcd" "ehci_pci" "ahci" "usbhid" "usb_storage" "sd_mod" ];
+  boot.initrd.kernelModules = [ "dm-snapshot" "cryptd" ];
+  boot.initrd.luks.devices."cryptroot".device = "/dev/disk/by-label/NIXOS_LUKS";
+  boot.kernelModules = [ "kvm-intel" "wl" ];
+  boot.extraModulePackages = [ config.boot.kernelPackages.broadcom_sta ];
+
+  fileSystems."/" =
+    { device = "/dev/disk/by-label/NIXOS_ROOT";
+      fsType = "ext4";
+    };
+
+  fileSystems."/boot" =
+    { device = "/dev/disk/by-label/NIXOS_BOOT";
+      fsType = "vfat";
+      options = [ "fmask=0077" "dmask=0077" ];
+    };
+
+  swapDevices =
+    [ { device = "/dev/disk/by-label/NIXOS_SWAP"; }
+    ];
+
+  # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
+  # (the default) this is the recommended approach. When using systemd-networkd it's
+  # still possible to use this option, but it's recommended to use it in conjunction
+  # with explicit per-interface declarations with `networking.interfaces.<interface>.useDHCP`.
+  networking.useDHCP = lib.mkDefault true;
+  # networking.interfaces.enp0s29f7u1u1.useDHCP = lib.mkDefault true;
+  # networking.interfaces.wlp2s0b1.useDHCP = lib.mkDefault true;
+
+  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+  hardware.enableAllFirmware = true;
+  hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
+}
+#+end_src
+
+*** hardware-configuration.nix tangle
+
+#+NAME: hardware-configuration.nix-current-dir
+#+BEGIN_SRC nix :noweb yes :tangle "hardware-configuration.nix"
+<<hardware-configuration.nix>>
+#+END_SRC
+
+** flake.nix
+*** flake.nix config
+
+#+NAME: flake.nix
+#+begin_src nix
+{
+  description = "NixOS configuration for MacBook Air 2011";
+
+  inputs = {
+    # NixOS official package source, pinned to the nixos-unstable
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  };
+
+  outputs = { self, nixpkgs,... }@inputs: {
+    # Define a NixOS system configuration
+    # host name set to castor
+    nixosConfigurations.castor = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux"; # Specify the system architecture
+      specialArgs = { inherit inputs; }; # Pass the 'inputs' attribute set to modules
+      modules = [
+        # Import your existing configuration files
+       ./configuration.nix
+      ];
+    };
+  };
+}
+#+end_src
+
+*** flake.nix tangle
+
+#+NAME: flake.nix-current-dir
+#+BEGIN_SRC nix :noweb yes :tangle "flake.nix"
+<<flake.nix>>
+#+END_SRC
+
