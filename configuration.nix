@@ -83,9 +83,6 @@
   # Enable the COSMIC desktop environment
   services.desktopManager.cosmic.enable = true;
 
-  # cosmic clipboard
-  environment.sessionVariables.COSMIC_DATA_CONTROL_ENABLED = 1;
-
   thermald.enable = true;
   printing.enable = false;
   libinput.enable = true;
@@ -169,6 +166,9 @@ security.doas = {
   };
 };
 
+
+  # cosmic clipboard
+  environment.sessionVariables.COSMIC_DATA_CONTROL_ENABLED = 1;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
