@@ -232,7 +232,7 @@ security.doas = {
 
 
   # cosmic clipboard
-  environment.sessionVariables.COSMIC_DATA_CONTROL_ENABLED = 1;
+  #environment.sessionVariables.COSMIC_DATA_CONTROL_ENABLED = 1;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
