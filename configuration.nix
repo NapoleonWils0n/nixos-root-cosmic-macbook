@@ -69,6 +69,7 @@
 
   # Enable the X11 windowing system.
   services = {
+    system76-scheduler.enable = true; # cosmic scheduler
     xserver = {
       enable = true;
   xkb = {
@@ -94,6 +95,9 @@
   };
 
 };
+
+  # cosmic clipboard
+  environment.sessionVariables.COSMIC_DATA_CONTROL_ENABLED = 1;
 
   hardware = {
     graphics = {
@@ -148,10 +152,6 @@ security.doas = {
 
   # programs.firefox.enable = true;
   programs = {
-  firefox.preferences = {
-    # disable libadwaita theming for Firefox
-    "widget.gtk.libadwaita-colors.enabled" = false;
-  };
   zsh = {
       enable = true;
       enableCompletion = true;
