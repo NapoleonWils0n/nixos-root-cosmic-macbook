@@ -113,7 +113,6 @@
 
   # Enable touchpad support (enabled default in most desktopManager).
 
-  users.users.djwilcox.initialPassword = "password";
   users.mutableUsers = true;
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
