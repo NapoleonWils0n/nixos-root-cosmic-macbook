@@ -118,7 +118,7 @@
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.djwilcox = {
     isNormalUser = true;
-    extraGroups = [ "wheel audio networkmanager video" ]; # Enable ‘sudo’ for the user.
+    extraGroups = [ "wheel" "audio" "networkmanager" "video" ]; # Enable ‘sudo’ for the user.
   };
 
   users.users.djwilcox.shell = pkgs.zsh;
