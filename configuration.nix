@@ -60,10 +60,24 @@
   console.keyMap = "us";
   nixpkgs.config.allowUnfree = true;
 
+  # dbus
+  services.dbus.packages = [ pkgs.xdg-desktop-portal-cosmic ];
+
   # --- XDG Desktop Portal Configuration for Wayland ---
   xdg.portal = {
     enable = true;
-    xdgOpenUsePortal = true; # Recommended for better portal integration
+    extraPortals = [ 
+      pkgs.xdg-desktop-portal-cosmic
+      pkgs.xdg-desktop-portal-gtk
+    ];
+  
+    config = {
+      # Default for all sessions
+      common.default = [ "gtk" ];
+      
+      # Specific override for your COSMIC session
+      cosmic.default = [ "cosmic" ];
+    };
   };
 
 
@@ -173,6 +187,7 @@ security.doas = {
   # $ nix search wget
   environment.systemPackages = with pkgs; [
   vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+  xdg-desktop-portal-cosmic
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
