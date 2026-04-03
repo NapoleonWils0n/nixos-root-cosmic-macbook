@@ -1,48 +1,110 @@
+#===============================================================================
 # Edit this configuration file to define what should be installed on
 # your system. Help is available in the configuration.nix(5) man page, on
 # https://search.nixos.org/options and in the NixOS manual (`nixos-help`).
+#===============================================================================
+
+
+#===============================================================================
+# config, lib, pkgs
+#===============================================================================
 
 { config, lib, pkgs, ... }:
 
+
+#===============================================================================
+# import - hardware-configuration.nix
+#===============================================================================
+
 {
-  imports =
-    [ # Include the results of the hardware scan.
-      ./hardware-configuration.nix
-    ];
+imports =
+  [
+    ./hardware-configuration.nix
+  ];
 
-  # Use the systemd-boot EFI boot loader.
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
-  boot.tmp.cleanOnBoot = true;
 
-  networking.hostName = "castor"; # Define your hostname.
-  # Pick only one of the below networking options.
-  networking.networkmanager.enable = true;  # Easiest to use and most distros use this by default.
-  networking.hostId = "37725d60";
+#===============================================================================
+# boot
+#===============================================================================
 
-  # Set your time zone.
-  time.timeZone = "Europe/London";
+boot = {
+  # clean tmp on boot
+  tmp.cleanOnBoot = true;
 
-  # broadcom fix permitted insecure packages
-  nixpkgs.config.allowInsecurePredicate = pkg:
+  # use the systemd-boot EFI boot loader.
+  loader = {
+    systemd-boot.enable = true;
+    efi.canTouchEfiVariables = true;
+  };
+};
+
+
+#===============================================================================
+# nix 
+#===============================================================================
+
+nix = {
+  settings = {
+    # auto-optimise-store
+    auto-optimise-store = true;
+    # flakes
+    experimental-features = [ "nix-command" "flakes" ];
+  };
+
+  # nix garbage collection
+  gc = {
+    automatic = true;
+    dates = "weekly";
+    options = "--delete-older-than 7d";
+  };
+};
+
+
+#===============================================================================
+# nixpkgs
+#===============================================================================
+
+nixpkgs = {
+  config = {
+    allowUnfree = true;
+  
+    # broadcom fix permitted insecure packages
+    allowInsecurePredicate = pkg:
     builtins.elem (lib.getName pkg) [
       "broadcom-sta" # aka “wl”
     ];
+ };
+};
 
-  # nix garbage collection
-  nix = {
-    settings.auto-optimise-store = true;
-    gc = {
-      automatic = true;
-      dates = "weekly";
-      options = "--delete-older-than 7d";
-    };
-  };
 
-  # Select internationalisation properties.
-  i18n.defaultLocale = "en_GB.UTF-8";
+#===============================================================================
+# console keymap
+#===============================================================================
 
-  i18n.extraLocaleSettings = {
+console.keyMap = "us";
+
+
+#===============================================================================
+# time zone
+#===============================================================================
+
+time.timeZone = "Europe/London";
+
+
+#===============================================================================
+# environment.sessionVariables - comsic clipboard
+#===============================================================================
+
+environment.sessionVariables.COSMIC_DATA_CONTROL_ENABLED = 1;
+
+
+#===============================================================================
+# Select internationalisation properties.
+#===============================================================================
+
+i18n = {
+  defaultLocale = "en_GB.UTF-8";
+  extraLocaleSettings = {
     LC_ADDRESS = "en_GB.UTF-8";
     LC_IDENTIFICATION = "en_GB.UTF-8";
     LC_MEASUREMENT = "en_GB.UTF-8";
@@ -53,125 +115,173 @@
     LC_TELEPHONE = "en_GB.UTF-8";
     LC_TIME = "en_GB.UTF-8";
   };
+};
 
-  # nix flakes
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
-  console.keyMap = "us";
-  nixpkgs.config.allowUnfree = true;
+#===============================================================================
+# users
+#===============================================================================
 
-  # dbus
-  services.dbus.packages = [ pkgs.xdg-desktop-portal-cosmic ];
+users = {
+  mutableUsers = true; # mutable user set a password with ‘passwd’
 
-  # --- XDG Desktop Portal Configuration for Wayland ---
-  xdg.portal = {
-    enable = true;
-    extraPortals = [ 
-      pkgs.xdg-desktop-portal-cosmic
-      pkgs.xdg-desktop-portal-gtk
-    ];
+  # user
+  users.djwilcox = {
+    shell = pkgs.zsh; # shell
+    isNormalUser = true;
+    extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
+  };
+};
+
+
+#===============================================================================
+# hardware graphics
+#===============================================================================
+
+hardware = {
+ graphics = {
+   enable = true;
+   extraPackages = with pkgs; [
+     intel-vaapi-driver
+     libva-vdpau-driver
+     libvdpau-va-gl
+  ];
+ };
+};
   
-    config = {
-      # Default for all sessions
-      common.default = [ "gtk" ];
-      
-      # Specific override for your COSMIC session
-      cosmic.default = [ "cosmic" ];
+
+#===============================================================================
+# services
+#===============================================================================
+
+services = {
+  dbus.packages = [ pkgs.xdg-desktop-portal-cosmic ]; # dbus
+  system76-scheduler.enable = true; # cosmic scheduler
+
+ # xserver
+  xserver = {
+    enable = true;
+
+   # xkb
+    xkb = {
+      layout = "gb";
+      variant = "mac";
+      };
     };
-  };
-
-
-  # Enable the X11 windowing system.
-  services = {
-    system76-scheduler.enable = true; # cosmic scheduler
-    xserver = {
-      enable = true;
-  xkb = {
-  layout = "gb";
-  variant = "mac";
-  };
-  };
 
   # Enable the COSMIC login manager
   displayManager.cosmic-greeter.enable = true;
-
+  
   # Enable the COSMIC desktop environment
   desktopManager.cosmic.enable = true;
-
+  
+  openssh.enable = true; # ssh
   thermald.enable = true;
-  printing.enable = false;
-  libinput.enable = true;
-  openssh.enable = true;
-
+  printing.enable = false; # disable cups printing
+  libinput.enable = true;  # libinput - touchpad
+  
+  # pipewire
   pipewire = {
     enable = true;
     pulse.enable = true;
   };
-
 };
 
-  # cosmic clipboard
-  environment.sessionVariables.COSMIC_DATA_CONTROL_ENABLED = 1;
 
-  hardware = {
-    graphics = {
-      enable = true;
-      extraPackages = with pkgs; [
-        intel-vaapi-driver
-        libva-vdpau-driver
-        libvdpau-va-gl
-     ];
-    };
-};
+#===============================================================================
+# security 
+#===============================================================================
+
+security = {
+  sudo.enable = true;  # sudo
+  rtkit.enable = true; # rtkit for audio
+
+  # doas
+  doas = {
+    enable = true;
+    extraConfig = ''
+      # allow user
+      permit keepenv setenv { PATH } djwilcox
+      
+      # allow root to switch to our user
+      permit nopass keepenv setenv { PATH } root as djwilcox
   
-
-  # Enable touchpad support (enabled default in most desktopManager).
-
-  users.mutableUsers = true;
-
-  # Define a user account. Don't forget to set a password with ‘passwd’.
-  users.users.djwilcox = {
-    isNormalUser = true;
-    extraGroups = [ "wheel" "audio" "networkmanager" "video" ]; # Enable ‘sudo’ for the user.
+      # nopass
+      permit nopass keepenv setenv { PATH } djwilcox
+  
+      # nixos-rebuild switch
+      permit nopass keepenv setenv { PATH } djwilcox cmd nixos-rebuild
+      
+      # root as root
+      permit nopass keepenv setenv { PATH } root as root
+    '';
   };
-
-  users.users.djwilcox.shell = pkgs.zsh;
-  security.sudo.enable = true;
-
-# rtkit for audio
-security.rtkit.enable = true;
-
-# doas
-security.doas = {
-  enable = true;
-  extraConfig = ''
-    # allow user
-    permit keepenv setenv { PATH } djwilcox
-    
-    # allow root to switch to our user
-    permit nopass keepenv setenv { PATH } root as djwilcox
-
-    # nopass
-    permit nopass keepenv setenv { PATH } djwilcox
-
-    # nixos-rebuild switch
-    permit nopass keepenv setenv { PATH } djwilcox cmd nixos-rebuild
-    
-    # root as root
-    permit nopass keepenv setenv { PATH } root as root
-  '';
 };
 
 
-  # programs.firefox.enable = true;
-  programs = {
+#===============================================================================
+# networking
+#===============================================================================
+
+networking = {
+  hostName = "castor"; # Define your hostname.
+  hostId = "37725d60"; # hostid
+  networkmanager.enable = true;  # network manager
+
+  # firewall
+  # Open ports in the firewall.
+  # transmission ports 6881 6882
+
+  firewall = {
+  # allowedTCPPorts
+  allowedTCPPorts = [ 6881 ];
+
+  # allowedUDPPorts
+  allowedUDPPorts = [ 6882 ];
+  };
+};
+
+
+#===============================================================================
+# XDG Desktop Portal Configuration for Wayland
+#===============================================================================
+
+xdg.portal = {
+  enable = true;
+
+  extraPortals = [ 
+    pkgs.xdg-desktop-portal-cosmic
+    pkgs.xdg-desktop-portal-gtk
+  ];
+
+  config = {
+    # Default for all sessions
+    common.default = [ "gtk" ];
+    
+    # Specific override for your COSMIC session
+    cosmic.default = [ "cosmic" ];
+  };
+};
+
+
+#===============================================================================
+# programs
+#===============================================================================
+
+programs = {
+  # zsh shell
   zsh = {
       enable = true;
       enableCompletion = true;
       syntaxHighlighting.enable = true;
    };
-   dconf.enable = true;
-   mtr.enable = true;
+
+
+  # dconf
+  dconf.enable = true;
+
+  # mtr
+  mtr.enable = true;
 
    gnupg.agent = {
     enable = true;
@@ -180,33 +290,19 @@ security.doas = {
 };
 
 
-  # cosmic clipboard
-  #environment.sessionVariables.COSMIC_DATA_CONTROL_ENABLED = 1;
+#===============================================================================
+# systemPackages
+#===============================================================================
 
-  # List packages installed in system profile. To search, run:
-  # $ nix search wget
-  environment.systemPackages = with pkgs; [
-  vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+environment.systemPackages = with pkgs; [
+  vim # Do not forget to add an editor to edit configuration.nix!
   xdg-desktop-portal-cosmic
-  ];
+];
 
-  # Some programs need SUID wrappers, can be configured further or are
-  # started in user sessions.
 
-  # List services that you want to enable:
-
-  # Enable the OpenSSH daemon.
-
-  # Open ports in the firewall.
-  networking.firewall.allowedTCPPorts = [ 6881 ];
-  networking.firewall.allowedUDPPorts = [ 6882 ];
-  # Or disable the firewall altogether.
-  # networking.firewall.enable = false;
-
-  # Copy the NixOS configuration file and link it from the resulting system
-  # (/run/current-system/configuration.nix). This is useful in case you
-  # accidentally delete configuration.nix.
-  #system.copySystemConfiguration = true;
+#===============================================================================
+# system.stateVersion
+#===============================================================================
 
   # This option defines the first version of NixOS you have installed on this particular machine,
   # and is used to maintain compatibility with application data (e.g. databases) created on older NixOS versions.
@@ -226,5 +322,4 @@ security.doas = {
   #
   # For more information, see `man configuration.nix` or https://nixos.org/manual/nixos/stable/options#opt-system.stateVersion .
   system.stateVersion = "25.05"; # Did you read the comment?
-
 }
