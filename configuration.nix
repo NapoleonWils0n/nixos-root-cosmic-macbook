@@ -151,6 +151,18 @@ hardware = {
   
 
 #===============================================================================
+# systemd.services
+#===============================================================================
+
+systemd = {
+  services = {
+    unbound.wants = [ "dnscrypt-proxy.service" ]; # unbound wants dnscrypt
+    unbound.after = [ "dnscrypt-proxy.service" ]; # unbound after dnscrypt
+  };
+};
+
+
+#===============================================================================
 # services
 #===============================================================================
 
@@ -184,6 +196,48 @@ services = {
   pipewire = {
     enable = true;
     pulse.enable = true;
+  };
+
+  # dnscrypt
+  dnscrypt-proxy = {
+    enable = true;
+    settings = {
+      require_dnssec = true;
+      require_nolog = true;
+      require_nofilter = true;
+      listen_addresses = [ "127.0.0.1:5300" ];
+
+      sources.public-resolvers = {
+      urls = [
+        "https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/public-resolvers.md"
+        "https://download.dnscrypt.info/resolvers-list/v3/public-resolvers.md"
+      ];
+      cache_file = "/var/cache/dnscrypt-proxy/public-resolvers.md";
+      minisign_key = "RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3";
+      };
+    };
+ };
+
+  # unbound
+  unbound = {
+    enable = true;
+
+    settings = {
+      server = {
+         do-not-query-localhost = false;
+         interface = [ "127.0.0.1" "10.200.1.1" ];
+         port = 53;
+         access-control = [ "127.0.0.0/8 allow" "10.200.1.0/24 allow" ];
+         module-config = ''"validator iterator"'';
+      };
+      # Forward all queries to dnscrypt-proxy
+      forward-zone = [
+        {
+          name = ".";
+          forward-addr = [ "127.0.0.1@5300" "9.9.9.9" "1.4.1.1" ];
+        }
+      ];
+    };
   };
 };
 
@@ -224,9 +278,33 @@ security = {
 #===============================================================================
 
 networking = {
+  # dns
+  nameservers = [ "127.0.0.1" ];
+  networkmanager.dns = "none";
+  networkmanager.enable = true;  # network manager
+
   hostName = "castor"; # Define your hostname.
   hostId = "37725d60"; # hostid
-  networkmanager.enable = true;  # network manager
+
+  # dummy network interface
+  networkmanager.ensureProfiles.profiles = {
+    dummy0 = {
+      connection = {
+        id = "dummy0";
+        type = "dummy";
+        interface-name = "dummy0";
+      };
+      ipv4 = {
+        address1 = "10.200.1.1/24";
+        method = "manual";
+      };
+    };
+  };
+
+  # dummy network interface
+  interfaces.dummy0 = {
+    ipv4.addresses = [ { address = "10.200.1.1"; prefixLength = 24; } ];
+  };
 
   # firewall
   # Open ports in the firewall.
@@ -238,6 +316,10 @@ networking = {
 
   # allowedUDPPorts
   allowedUDPPorts = [ 6882 ];
+
+  # trust the veth-host dummy0 interfaces 
+  trustedInterfaces = [ "veth-host" "dummy0" ]; 
+
   };
 };
 
